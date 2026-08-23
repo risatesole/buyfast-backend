@@ -1,5 +1,5 @@
 # inventory/queries.py
-from django.db.models import Q, Sum, Value, IntegerField
+from django.db.models import OuterRef, Q, Subquery, Value, IntegerField
 from django.db.models.functions import Coalesce
 
 INVENTORY_ORDERING_FIELDS = [
@@ -36,14 +36,28 @@ def get_variant_current_stock(variant_id):
 def annotate_variant_stock(queryset):
     """
     Adds a computed `total_quantity` field to a ProductVariant queryset, equal
-    to the sum of all its stock movement balances (0 if it has none yet).
+    to the `balance` on its most recent stock movement (0 if it has none yet)
+    - i.e. the same "current stock" definition as get_variant_current_stock().
+
+    `balance` is already a running cumulative total after each movement, so
+    summing it across movements (the previous implementation) double/triple
+    counts; only the latest row's balance reflects current stock.
 
     Shared by the admin inventory list view and the admin dashboard summary
     view so both compute current stock the exact same way.
     """
+    from .models import StockMovement_model
+
+    latest_balance = (
+        StockMovement_model.objects
+        .filter(product_variant=OuterRef('pk'))
+        .order_by('-date_time', '-id')
+        .values('balance')[:1]
+    )
+
     return queryset.annotate(
         total_quantity=Coalesce(
-            Sum('stock_movements__balance'),
+            Subquery(latest_balance, output_field=IntegerField()),
             Value(0),
             output_field=IntegerField()
         )

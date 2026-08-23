@@ -1,8 +1,7 @@
 from rest_framework import serializers
-from django.db.models import Sum
 from products.default.models import ProductVariant
 from products.default.models.product_model import Product
-from inventory.models import StockMovement_model
+from inventory.queries import get_variant_current_stock
 
 class ProductInventorySerializer(serializers.ModelSerializer):
     product_id = serializers.IntegerField(source='product.id')
@@ -12,21 +11,24 @@ class ProductInventorySerializer(serializers.ModelSerializer):
     thumbnail = serializers.SerializerMethodField()
     quantity = serializers.SerializerMethodField()
     inventory_status = serializers.SerializerMethodField()
+    below_minimum_stock = serializers.SerializerMethodField()
     images = serializers.SerializerMethodField()
-    
+
     class Meta:
         model = ProductVariant
         fields = [
             'variant_id',           # Variant ID
             'product_id',           # Product ID
-            'product_name', 
-            'product_description', 
-            'thumbnail', 
+            'product_name',
+            'product_description',
+            'thumbnail',
             'quantity',
             'inventory_status',
+            'minimum_stock',
+            'below_minimum_stock',
             'images',
-            'sku', 
-            'variantnumber', 
+            'sku',
+            'variantnumber',
             'status',
             'selling_price'
         ]
@@ -79,12 +81,11 @@ class ProductInventorySerializer(serializers.ModelSerializer):
     
     def get_quantity(self, obj):
         """
-        Calculate total quantity from stock movements
+        Current stock: the `balance` on the variant's most recent stock
+        movement (see get_variant_current_stock - shared with every other
+        "current stock" computation in the app).
         """
-        total_quantity = StockMovement_model.objects.filter(
-            product_variant=obj
-        ).aggregate(total=Sum('balance'))['total']
-        return total_quantity if total_quantity is not None else 0
+        return get_variant_current_stock(obj.id)
     
     def get_inventory_status(self, obj):
         """
@@ -100,3 +101,12 @@ class ProductInventorySerializer(serializers.ModelSerializer):
             return 'medium_stock'
         else:
             return 'in_stock'
+
+    def get_below_minimum_stock(self, obj):
+        """
+        Whether this variant's own configured minimum_stock alert threshold
+        has been reached (0 means the alert is disabled for this variant).
+        """
+        if obj.minimum_stock <= 0:
+            return False
+        return self.get_quantity(obj) <= obj.minimum_stock

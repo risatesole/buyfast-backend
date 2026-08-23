@@ -2,11 +2,9 @@ from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.pagination import PageNumberPagination, LimitOffsetPagination
-from django.db.models import Sum
 from products.default.models import ProductVariant
-from inventory.models import StockMovement_model
 from inventory.serializers import ProductInventorySerializer
-from inventory.queries import annotate_variant_stock, apply_admin_inventory_filters
+from inventory.queries import annotate_variant_stock, apply_admin_inventory_filters, get_variant_current_stock
 from api.permissions import permission_required
 
 class CustomPagination(PageNumberPagination):
@@ -111,10 +109,7 @@ class AdminLowStockView(generics.ListAPIView):
         return low_stock_variants
     
     def get_variant_quantity(self, variant):
-        total = StockMovement_model.objects.filter(
-            product_variant=variant
-        ).aggregate(total=Sum('balance'))['total']
-        return total if total is not None else 0
+        return get_variant_current_stock(variant.id)
 
 class AdminOutOfStockView(generics.ListAPIView):
     """
@@ -140,10 +135,7 @@ class AdminOutOfStockView(generics.ListAPIView):
         return out_of_stock_variants
     
     def get_variant_quantity(self, variant):
-        total = StockMovement_model.objects.filter(
-            product_variant=variant
-        ).aggregate(total=Sum('balance'))['total']
-        return total if total is not None else 0
+        return get_variant_current_stock(variant.id)
 
 class AdminInventorySummaryView(APIView):
     """
@@ -241,10 +233,7 @@ class AdminInventorySummaryView(APIView):
         })
     
     def get_variant_quantity(self, variant):
-        total = StockMovement_model.objects.filter(
-            product_variant=variant
-        ).aggregate(total=Sum('balance'))['total']
-        return total if total is not None else 0
+        return get_variant_current_stock(variant.id)
 
 class AdminBulkInventoryUpdateView(APIView):
     """

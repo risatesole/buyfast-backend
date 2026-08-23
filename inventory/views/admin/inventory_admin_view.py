@@ -64,6 +64,7 @@ class StockMovementSerializer:
             "status": product_variant.status,
             "selling_price": float(product_variant.selling_price) if product_variant.selling_price else 0,
             "tax_rate": float(product_variant.tax_rate) if product_variant.tax_rate else 0,
+            "minimum_stock": product_variant.minimum_stock,
             "product": {
                 "id": product.id,
                 "name": product.name,
