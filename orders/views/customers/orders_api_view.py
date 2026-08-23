@@ -38,6 +38,7 @@ class OrderDetailView(APIView):
                         "status": order.status,
                         "pickup_time": order.pickup_time,
                         "pickup_code": order.pickup_code,
+                        "ready_for_pickup": order.ready_for_pickup,
                         "phone": order.customer.phone_number,
                         "address": {
                             "street": "unknown",

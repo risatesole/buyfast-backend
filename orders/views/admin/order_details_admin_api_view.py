@@ -6,7 +6,7 @@ from django.shortcuts import get_object_or_404
 from rest_framework import status
 from api.permissions import has_permission
 from ...models import Order, OrderItem, OrderCodeView_model
-from notifications.emailing import send_order_fulfilled_email
+from notifications.emailing import send_order_fulfilled_email, send_order_ready_for_pickup_email
 
 
 @api_view(['GET', 'POST'])
@@ -73,6 +73,7 @@ def order_details_admin_view(request, pk):
                 "status": order.status,
                 "pickup_time": order.pickup_time,
                 "pickup_code": order.pickup_code,
+                "ready_for_pickup": order.ready_for_pickup,
                 "created_at": order.created_at,
                 "items": items,
                 "total_items": sum(item["quantity"] for item in items)
@@ -83,45 +84,96 @@ def order_details_admin_view(request, pk):
                 status=status.HTTP_200_OK
             )
         
-        # Handle POST request - Mark order as fulfilled
+        # Handle POST request - Mark order ready for pickup / fulfilled
         elif request.method == 'POST':
 
-            if order.status == Order.Status.FULFILLED:
+            action = request.data.get("action", "fulfill")
+
+            if action in ("mark_ready", "unmark_ready"):
+                if order.status == Order.Status.FULFILLED:
                     return Response(
                         {
                             "status": "error",
-                            "message": "Esta orden ya fue marcada como completada."
+                            "message": "No se puede modificar una orden ya completada."
                         },
                         status=status.HTTP_400_BAD_REQUEST
                     )
 
-            submitted_code = str(request.data.get("code", "")).strip().upper()
-            if not submitted_code or submitted_code != order.pickup_code.upper():
+                order.ready_for_pickup = (action == "mark_ready")
+                order.save()
+
+                if order.ready_for_pickup:
+                    send_order_ready_for_pickup_email(
+                        to_email=order.customer.email,
+                        first_name=order.customer.first_name,
+                        last_name=order.customer.last_name,
+                        order_id=order.id,
+                        pickup_time=order.pickup_time,
+                    )
+
+                return Response(
+                    {
+                        "order_id": order.id,
+                        "ready_for_pickup": order.ready_for_pickup
+                    },
+                    status=status.HTTP_200_OK
+                )
+
+            elif action == "fulfill":
+                if order.status == Order.Status.FULFILLED:
+                        return Response(
+                            {
+                                "status": "error",
+                                "message": "Esta orden ya fue marcada como completada."
+                            },
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+
+                if not order.ready_for_pickup:
+                    return Response(
+                        {
+                            "status": "error",
+                            "message": "La orden debe marcarse como lista para retirar antes de completarse."
+                        },
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+                submitted_code = str(request.data.get("code", "")).strip().upper()
+                if not submitted_code or submitted_code != order.pickup_code.upper():
+                    return Response(
+                        {
+                            "status": "error",
+                            "message": "El código de retiro ingresado no coincide."
+                        },
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+                order.status = Order.Status.FULFILLED
+                order.save()
+                send_order_fulfilled_email(
+                    to_email=order.customer.email,
+                    first_name=order.customer.first_name,
+                    last_name=order.customer.last_name,
+                    order_id=order.id,
+                    pickup_time=order.pickup_time,
+                )
+
+                return Response(
+                    {
+                        "order_id": order.id,
+                        "new_status": order.status
+                    },
+                    status=status.HTTP_200_OK
+                )
+
+            else:
                 return Response(
                     {
                         "status": "error",
-                        "message": "El código de retiro ingresado no coincide."
+                        "message": f"Acción desconocida: {action}"
                     },
                     status=status.HTTP_400_BAD_REQUEST
                 )
-
-            order.status = Order.Status.FULFILLED
-            order.save()
-            send_order_fulfilled_email(
-                to_email=order.customer.email,
-                first_name=order.customer.first_name,
-                last_name=order.customer.last_name,
-                order_id=order.id,
-                pickup_time=order.pickup_time,
-            )
-            
-            return Response(
-                {
-                    "order_id": order.id,
-                    "new_status": order.status
-                },
-                status=status.HTTP_200_OK
-            )
 
     except PermissionDenied as e:
         return Response(

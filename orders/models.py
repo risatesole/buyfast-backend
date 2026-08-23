@@ -25,6 +25,7 @@ class Order(models.Model):
     )
     pickup_time = models.DateTimeField(null=True, blank=True)
     pickup_code = models.CharField(max_length=8, blank=True, default="")
+    ready_for_pickup = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

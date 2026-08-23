@@ -159,3 +159,17 @@ def send_order_fulfilled_email(*, to_email, first_name, last_name, order_id, pic
         },
         to_email=to_email,
     )
+
+
+def send_order_ready_for_pickup_email(*, to_email, first_name, last_name, order_id, pickup_time):
+    return _send_email(
+        subject=f"Tu pedido #{order_id} está listo para retirar",
+        template_name="order_ready_for_pickup.html",
+        context={
+            "first_name": first_name,
+            "last_name": last_name,
+            "order_id": order_id,
+            "pickup_time_display": format_pickup_time(pickup_time),
+        },
+        to_email=to_email,
+    )
