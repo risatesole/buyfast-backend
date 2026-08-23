@@ -173,3 +173,22 @@ def send_order_ready_for_pickup_email(*, to_email, first_name, last_name, order_
         },
         to_email=to_email,
     )
+
+
+def send_low_stock_alert_email(
+    *, to_email, first_name, last_name, product_name, variant_name, sku, current_stock, minimum_stock
+):
+    return _send_email(
+        subject=f"Alerta de stock bajo: {product_name} - {variant_name}",
+        template_name="low_stock_alert.html",
+        context={
+            "first_name": first_name,
+            "last_name": last_name,
+            "product_name": product_name,
+            "variant_name": variant_name,
+            "sku": sku,
+            "current_stock": current_stock,
+            "minimum_stock": minimum_stock,
+        },
+        to_email=to_email,
+    )

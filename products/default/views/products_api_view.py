@@ -75,6 +75,7 @@ class ProductDetailView(APIView):
                             'slug': v.slug.value,
                             'selling_price': float(v.SellingPrice.value),
                             'tax_rate': float(v.tax_rate.value),
+                            'minimum_stock': v.minimum_stock,
                             'image_hero': v.attributes.image_hero,
                             'image_thumbnail': v.attributes.image_thumbnail,
                             'image_gallery': v.attributes.image_gallery,
@@ -175,6 +176,7 @@ class ProductDetailView(APIView):
                                 "thumbnail": variant.thumbnail,
                                 "selling_price": float(variant.SellingPrice.value),
                                 "tax_rate": float(variant.tax_rate.value),
+                                "minimum_stock": variant.minimum_stock,
                                 "sku": variant.sku.value,
                                 "slug": variant.slug.value,
                                 "image_hero":variant.attributes.image_hero,
@@ -245,6 +247,7 @@ class ProductDetailView(APIView):
                 variant_slug = Slug(variant_data["slug"])
                 variant_selling_price = SellingPrice(Decimal(variant_data["selling_price"]))
                 variant_tax_rate = TaxRate(Decimal(variant_data["tax_rate"]))
+                variant_minimum_stock = int(variant_data.get("minimum_stock", 0) or 0)
 
                 # get variant initial inventory data to save to the inventory
                 variant_initial_inventory = variant_data["initial_inventory"]
@@ -292,6 +295,7 @@ class ProductDetailView(APIView):
                     tax_rate=variant_tax_rate,
                     images=variant_images if variant_images else None,
                     status=computed_status,
+                    minimum_stock=variant_minimum_stock,
                 )
 
                 product_variants.append(product_variant)
@@ -345,6 +349,7 @@ class ProductDetailView(APIView):
                             "slug": variant.slug.value,  # slug is Slug, has .value
                             "selling_price": float(variant.SellingPrice.value),  # SellingPrice, has .value
                             "tax_rate": float(variant.tax_rate.value),  # tax_rate is TaxRate, has .value
+                            "minimum_stock": variant.minimum_stock,
                             "status": variant.status,
                             "images": [
                                 {
@@ -450,6 +455,7 @@ class ProductDetailView(APIView):
                             "slug": v.slug.value,
                             "selling_price": float(v.SellingPrice.value),
                             "tax_rate": float(v.tax_rate.value),
+                            "minimum_stock": v.minimum_stock,
                             "status": v.status,
                             "images": [
                                 {"type": img.type, "url": img.url}

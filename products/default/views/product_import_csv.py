@@ -5,9 +5,9 @@ share the same `product_slug` are grouped together and treated as variants of
 the same product.
 
 example csv:
-SKU,initial inventory,selling_price,tax_rate,total_price,product_name,product_slug,category,product_type,variant_atribute,variant_name,variant_description,variant_slug,variant_status,image_thumbnail,image_thumbnail_alt_text,image_01,image_01_alt_text,image_02,image_02_alt_text,image_03,image_03_alt_text,image_04,image_04_alt_text
-ARC-4P-001,100,500,0.05,525,Archivador Carta,archivador-carta,papeleria,normal,4 Pulgadas,Archivador Carta - 4 Pulgadas,Archivador resistente tamaño carta,archivador-4-pulgadas,TRUE,https://example.com/thumb.jpg,imagen del thumbnail,https://example.com/img1.jpg,imagen 1,https://example.com/img2.jpg,imagen 2,,,,
-ARC-8P-001,100,700,0.05,735,Archivador Carta,archivador-carta,papeleria,normal,8 Pulgadas,Archivador Carta - 8 Pulgadas,Archivador resistente tamaño carta,archivador-8-pulgadas,TRUE,https://example.com/thumb.jpg,imagen del thumbnail,https://example.com/img1.jpg,imagen 1,,,,,,
+SKU,initial inventory,minimum_stock,selling_price,tax_rate,total_price,product_name,product_slug,category,product_type,variant_atribute,variant_name,variant_description,variant_slug,variant_status,image_thumbnail,image_thumbnail_alt_text,image_01,image_01_alt_text,image_02,image_02_alt_text,image_03,image_03_alt_text,image_04,image_04_alt_text
+ARC-4P-001,100,20,500,0.05,525,Archivador Carta,archivador-carta,papeleria,normal,4 Pulgadas,Archivador Carta - 4 Pulgadas,Archivador resistente tamaño carta,archivador-4-pulgadas,TRUE,https://example.com/thumb.jpg,imagen del thumbnail,https://example.com/img1.jpg,imagen 1,https://example.com/img2.jpg,imagen 2,,,,
+ARC-8P-001,100,20,700,0.05,735,Archivador Carta,archivador-carta,papeleria,normal,8 Pulgadas,Archivador Carta - 8 Pulgadas,Archivador resistente tamaño carta,archivador-8-pulgadas,TRUE,https://example.com/thumb.jpg,imagen del thumbnail,https://example.com/img1.jpg,imagen 1,,,,,,
 
 Notes on this format, compared to a "classic" product-import CSV:
     - The variant SKU column is simply called `SKU` (not `variant_sku`).
@@ -26,6 +26,11 @@ Notes on this format, compared to a "classic" product-import CSV:
       matching `_alt_text` column). Any slot left blank is skipped.
     - `initial inventory` (quantity) is used to create the opening stock
       movement for newly created variants via the `inventory` app.
+    - `minimum_stock` (optional) sets the variant's low-stock alert threshold
+      (ProductVariant.minimum_stock). Leaving it blank on a row for an
+      *existing* variant leaves its current threshold untouched (it does not
+      reset it to 0); leaving it blank for a *new* variant defaults it to 0
+      (alert disabled).
     - `total_price` is informational only (selling_price + tax) and is not
       stored anywhere; it is not validated against selling_price/tax_rate.
 
@@ -309,6 +314,23 @@ def validate_product_row(row: Dict[str, str], row_num: int) -> List[Dict[str, An
                 'row': row_num
             })
 
+    # Check minimum stock (optional)
+    if row.get('minimum_stock', '').strip():
+        try:
+            min_stock = int(row['minimum_stock'])
+            if min_stock < 0:
+                errors.append({
+                    'field': 'minimum_stock',
+                    'message': f'Minimum stock cannot be negative: {min_stock}',
+                    'row': row_num
+                })
+        except (ValueError, TypeError):
+            errors.append({
+                'field': 'minimum_stock',
+                'message': f'Invalid minimum stock: {row.get("minimum_stock")}',
+                'row': row_num
+            })
+
     # Check image URLs for each image slot, if provided
     for url_field, alt_field, _image_type, _order in IMAGE_SLOTS:
         image_url = row.get(url_field, '').strip()
@@ -371,6 +393,14 @@ def process_row_with_validation(row: Dict[str, str], row_num: int) -> Tuple[Dict
     except (ValueError, TypeError):
         initial_inventory = 0
 
+    # minimum_stock is left as None when the column is blank, so re-importing
+    # an existing variant without this column doesn't reset its threshold.
+    raw_minimum_stock = row.get('minimum_stock', '').strip()
+    try:
+        minimum_stock = int(raw_minimum_stock) if raw_minimum_stock else None
+    except (ValueError, TypeError):
+        minimum_stock = None
+
     # Collect the (up to 5) images defined for this row
     images = []
     for url_field, alt_field, image_type, default_order in IMAGE_SLOTS:
@@ -402,6 +432,7 @@ def process_row_with_validation(row: Dict[str, str], row_num: int) -> Tuple[Dict
         'selling_price': selling_price,
         'tax_rate': tax_decimal,
         'initial_inventory': initial_inventory,
+        'minimum_stock': minimum_stock,
 
         'images': images,
     }
@@ -627,6 +658,7 @@ def get_or_create_variant(product: Product, variant_data: Dict[str, Any]) -> Tup
                 selling_price=variant_data['selling_price'],
                 tax_rate=variant_data.get('tax_rate', Decimal('0')),
                 status=variant_data['variant_status'],
+                minimum_stock=variant_data.get('minimum_stock') or 0,
             )
             created = True
 
@@ -665,6 +697,10 @@ def get_or_create_variant(product: Product, variant_data: Dict[str, Any]) -> Tup
                 updated = True
             if variant.status != variant_data['variant_status']:
                 variant.status = variant_data['variant_status']
+                updated = True
+            new_minimum_stock = variant_data.get('minimum_stock')
+            if new_minimum_stock is not None and variant.minimum_stock != new_minimum_stock:
+                variant.minimum_stock = new_minimum_stock
                 updated = True
             if variant.product_id != product.id:
                 variant.product = product

@@ -56,6 +56,7 @@ class ProductRepository:
                 variant_price = variant.SellingPrice.value
                 variant_tax_rate = variant.tax_rate.value
                 variant_status = bool(variant.status)
+                variant_minimum_stock = variant.minimum_stock or 0
 
                 # Create the ProductVariant in DB
                 productvariant_db = ProductVariantModel.objects.create(
@@ -68,6 +69,7 @@ class ProductRepository:
                     tax_rate=variant_tax_rate,
                     variantnumber=variant_variantnumber,
                     status=variant_status,
+                    minimum_stock=variant_minimum_stock,
                 )
 
                 thumbnail = ProductImage.objects.create(
@@ -156,6 +158,7 @@ class ProductRepository:
             id=variant_db.id,
             SellingPrice=SellingPrice(variant_db.selling_price),
             tax_rate=TaxRate(variant_db.tax_rate),
+            minimum_stock=variant_db.minimum_stock,
         )
 
     def get_product_by_id(self, product_id: int) -> ProductEntity:
@@ -495,6 +498,8 @@ class ProductRepository:
                     variant_db.tax_rate = TaxRate(
                         Decimal(str(variant_data["tax_rate"]))
                     ).value
+                if "minimum_stock" in variant_data:
+                    variant_db.minimum_stock = max(0, int(variant_data["minimum_stock"]))
                 # status is derived from stock (see inventory/signals.py),
                 # never accepted from the client.
 

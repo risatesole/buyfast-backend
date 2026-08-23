@@ -22,7 +22,17 @@ class ProductVariant(models.Model):
     # Pricing & Tax
     selling_price = models.DecimalField(max_digits=10, decimal_places=2)
     tax_rate = models.DecimalField(max_digits=5, decimal_places=2, default=0)
-    
+
+    # Stock alert
+    minimum_stock = models.PositiveIntegerField(
+        default=0,
+        help_text="Low-stock alert threshold; 0 disables the alert for this variant.",
+    )
+    low_stock_notified = models.BooleanField(
+        default=False,
+        help_text="Whether the low-stock alert email has already been sent for the current dip.",
+    )
+
     # Tracking
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

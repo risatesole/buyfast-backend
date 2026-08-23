@@ -21,6 +21,7 @@ class ProductVariant(ABC):
     status: bool
     SellingPrice: Optional[SellingPrice] = None
     tax_rate: Optional[TaxRate] = None
-    images: Optional[List[ProductImages]] = None  
+    images: Optional[List[ProductImages]] = None
     id: Optional[int] = None
     thumbnail: Optional[str] = None
+    minimum_stock: int = 0
