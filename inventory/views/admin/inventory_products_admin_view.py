@@ -1,3 +1,7 @@
+from decimal import Decimal
+
+from django.db.models import Count, DecimalField, ExpressionWrapper, F, Q, Sum, Value
+from django.db.models.functions import Coalesce
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -139,101 +143,54 @@ class AdminOutOfStockView(generics.ListAPIView):
 
 class AdminInventorySummaryView(APIView):
     """
-    Admin view to get inventory summary statistics.
+    Admin view to get inventory summary statistics, aggregated across every
+    variant in the database (not just one paginated page).
+
+    Computed live via a single aggregate query on each request, so it always
+    reflects the latest stock movements (sales, inventory entries/decreases,
+    etc.) with no separate table to keep in sync.
     """
     permission_classes = [permission_required("inventory.view")]
-    
+
     def get(self, request):
-        # Total product variants
-        total_variants = ProductVariant.objects.count()
-        
-        # Total products
+        queryset = annotate_variant_stock(ProductVariant.objects.all())
+
+        value_expression = ExpressionWrapper(
+            F('total_quantity') * F('selling_price'),
+            output_field=DecimalField(max_digits=14, decimal_places=2),
+        )
+
+        totals = queryset.aggregate(
+            total_variants=Count('id'),
+            total_items_in_stock=Coalesce(Sum('total_quantity'), Value(0)),
+            total_inventory_value=Coalesce(
+                Sum(value_expression),
+                Value(Decimal('0')),
+                output_field=DecimalField(max_digits=14, decimal_places=2),
+            ),
+            out_of_stock_count=Count('id', filter=Q(total_quantity__lte=0)),
+            # Mirrors ProductInventorySerializer.get_below_minimum_stock: each
+            # variant's own minimum_stock alert threshold (0 = alert disabled).
+            low_stock_count=Count(
+                'id',
+                filter=Q(
+                    total_quantity__gt=0,
+                    minimum_stock__gt=0,
+                    total_quantity__lte=F('minimum_stock'),
+                ),
+            ),
+        )
+
         total_products = ProductVariant.objects.values('product').distinct().count()
-        
-        # Products with stock
-        products_with_stock = 0
-        total_items = 0
-        total_value = 0
-        
-        variants = ProductVariant.objects.all().select_related('product')
-        for variant in variants:
-            quantity = self.get_variant_quantity(variant)
-            total_items += quantity
-            total_value += quantity * float(variant.selling_price) if quantity > 0 else 0
-            if quantity > 0:
-                products_with_stock += 1
-        
-        # Low stock count (threshold = 10)
-        low_stock_count = 0
-        for variant in variants:
-            quantity = self.get_variant_quantity(variant)
-            if 0 < quantity < 10:
-                low_stock_count += 1
-        
-        # Out of stock count
-        out_of_stock_count = 0
-        for variant in variants:
-            quantity = self.get_variant_quantity(variant)
-            if quantity == 0:
-                out_of_stock_count += 1
-        
-        # In stock count (> 50)
-        in_stock_count = 0
-        for variant in variants:
-            quantity = self.get_variant_quantity(variant)
-            if quantity > 50:
-                in_stock_count += 1
-        
-        # Medium stock count (10-50)
-        medium_stock_count = 0
-        for variant in variants:
-            quantity = self.get_variant_quantity(variant)
-            if 10 <= quantity <= 50:
-                medium_stock_count += 1
-        
-        # Category breakdown
-        category_breakdown = {}
-        for variant in variants:
-            category = variant.product.category.slug if variant.product.category else "uncategorized"
-            if category not in category_breakdown:
-                category_breakdown[category] = {
-                    'count': 0,
-                    'items': 0,
-                    'value': 0,
-                    'out_of_stock': 0,
-                    'low_stock': 0,
-                    'medium_stock': 0,
-                    'in_stock': 0
-                }
-            quantity = self.get_variant_quantity(variant)
-            category_breakdown[category]['count'] += 1
-            category_breakdown[category]['items'] += quantity
-            category_breakdown[category]['value'] += quantity * float(variant.selling_price)
-            
-            if quantity <= 0:
-                category_breakdown[category]['out_of_stock'] += 1
-            elif quantity <= 10:
-                category_breakdown[category]['low_stock'] += 1
-            elif quantity <= 50:
-                category_breakdown[category]['medium_stock'] += 1
-            else:
-                category_breakdown[category]['in_stock'] += 1
-        
+
         return Response({
-            'total_variants': total_variants,
+            'total_variants': totals['total_variants'],
             'total_products': total_products,
-            'products_with_stock': products_with_stock,
-            'total_items_in_stock': total_items,
-            'total_inventory_value': round(total_value, 2),
-            'low_stock_count': low_stock_count,
-            'out_of_stock_count': out_of_stock_count,
-            'medium_stock_count': medium_stock_count,
-            'in_stock_count': in_stock_count,
-            'category_breakdown': category_breakdown,
+            'total_items_in_stock': totals['total_items_in_stock'],
+            'total_inventory_value': round(float(totals['total_inventory_value']), 2),
+            'low_stock_count': totals['low_stock_count'],
+            'out_of_stock_count': totals['out_of_stock_count'],
         })
-    
-    def get_variant_quantity(self, variant):
-        return get_variant_current_stock(variant.id)
 
 class AdminBulkInventoryUpdateView(APIView):
     """
