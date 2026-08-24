@@ -185,6 +185,18 @@ def user_details_api_view(request, id):
     # Soporte para actualizar matrícula
     new_matricula = request.data.get("matricula")
     if new_matricula is not None:
+        # Matricula is an official institutional ID — only a superuser (not
+        # just any employees.manage/customers.manage holder) may change it,
+        # same precedent as the protected-profile assignment check below.
+        if not request.user.is_superuser:
+            return Response(
+                {
+                    "success": False,
+                    "message": "Only a superuser can change the matricula.",
+                },
+                status=403,
+            )
+
         if not isinstance(new_matricula, str):
             return Response(
                 {
