@@ -13,22 +13,29 @@ ADMIN_FIRST_NAME = "Admin"
 ADMIN_LAST_NAME = "Admin"
 
 
-def _gallery(base_url, alt_text):
+def _gallery(image_urls, alt_text):
     """
-    Builds the standard 4-image set for a variant (HERO, GALLERY, DETAIL,
-    THUMBNAIL) by re-cropping the same source photo at different sizes —
-    same approach already used for the category banner/cart/default images.
+    Builds a variant's image set from at least 3 distinct source photos —
+    one each for HERO, GALLERY, and DETAIL — plus a LIFESTYLE crop (reusing
+    the gallery photo) and a THUMBNAIL crop (reusing the hero photo, since
+    that's the row the repository pulls out separately for
+    ProductVariant.thumbnail).
     """
+    hero_url, gallery_url, detail_url = image_urls[0], image_urls[1], image_urls[2]
+
     return [
-        {"image": f"{base_url}?w=800&h=800&fit=crop", "image_type": "HERO", "alt_text": alt_text, "order": 0},
-        {"image": f"{base_url}?w=800&h=600&fit=crop", "image_type": "GALLERY", "alt_text": alt_text, "order": 1},
-        {"image": f"{base_url}?w=600&h=600&fit=crop", "image_type": "DETAIL", "alt_text": alt_text, "order": 2},
-        {"image": f"{base_url}?w=200&h=200&fit=crop", "image_type": "THUMBNAIL", "alt_text": alt_text, "order": 3},
+        {"image": f"{hero_url}?w=800&h=800&fit=crop", "image_type": "HERO", "alt_text": alt_text, "order": 0},
+        {"image": f"{gallery_url}?w=800&h=600&fit=crop", "image_type": "GALLERY", "alt_text": alt_text, "order": 1},
+        {"image": f"{detail_url}?w=600&h=600&fit=crop", "image_type": "DETAIL", "alt_text": alt_text, "order": 2},
+        {"image": f"{gallery_url}?w=750&h=500&fit=crop", "image_type": "LIFESTYLE", "alt_text": alt_text, "order": 3},
+        {"image": f"{hero_url}?w=200&h=200&fit=crop", "image_type": "THUMBNAIL", "alt_text": alt_text, "order": 4},
     ]
 
 
 # Each entry mirrors the Product -> ProductVariant -> ProductImage shape:
-# one product, its variant(s), and each variant's image(s), all in one JSON-like block.
+# one product, its variant(s), and each variant's image(s), all in one JSON-like
+# block — the 3 source photos for a variant live right next to that variant,
+# in its own "images" list, instead of in a separate lookup table.
 PRODUCTS = [
     {
         "name": "Cuaderno Universitario 100 Hojas",
@@ -48,7 +55,11 @@ PRODUCTS = [
                 "minimum_stock": 10,
                 "initial_stock": 50,
                 "images": _gallery(
-                    "https://images.unsplash.com/photo-1531346878377-a5be20888e57",
+                    [
+                        "https://images.unsplash.com/photo-1531346878377-a5be20888e57",
+                        "https://images.unsplash.com/photo-1517842645767-c639042777db",
+                        "https://images.unsplash.com/photo-1568205612837-017257d2310a",
+                    ],
                     "Cuaderno universitario de 100 hojas rayado",
                 ),
             },
@@ -64,7 +75,11 @@ PRODUCTS = [
                 "minimum_stock": 10,
                 "initial_stock": 45,
                 "images": _gallery(
-                    "https://images.unsplash.com/photo-1531346878377-a5be20888e57",
+                    [
+                        "https://images.unsplash.com/photo-1531346878377-a5be20888e57",
+                        "https://images.unsplash.com/photo-1517842645767-c639042777db",
+                        "https://images.unsplash.com/photo-1568205612837-017257d2310a",
+                    ],
                     "Cuaderno universitario de 100 hojas cuadriculado",
                 ),
             },
@@ -74,7 +89,7 @@ PRODUCTS = [
         "name": "Set de Bolígrafos Punta Fina",
         "slug": "set-boligrafos-punta-fina",
         "category_slug": "papeleria",
-        "thumbnail": "https://images.unsplash.com/photo-1583485088034-697b5bc36b90?w=400&h=400&fit=crop",
+        "thumbnail": "https://images.unsplash.com/photo-1568051243858-533a607809a5?w=400&h=400&fit=crop",
         "variants": [
             {
                 "name": "Set de Bolígrafos Punta Fina - Azul y Negro",
@@ -88,7 +103,11 @@ PRODUCTS = [
                 "minimum_stock": 15,
                 "initial_stock": 60,
                 "images": _gallery(
-                    "https://images.unsplash.com/photo-1583485088034-697b5bc36b90",
+                    [
+                        "https://images.unsplash.com/photo-1568051243858-533a607809a5",
+                        "https://images.unsplash.com/photo-1495364141860-b0d03eccd065",
+                        "https://images.unsplash.com/photo-1455390582262-044cdead277a",
+                    ],
                     "Set de bolígrafos punta fina azul y negro",
                 ),
             },
@@ -104,7 +123,11 @@ PRODUCTS = [
                 "minimum_stock": 15,
                 "initial_stock": 55,
                 "images": _gallery(
-                    "https://images.unsplash.com/photo-1583485088034-697b5bc36b90",
+                    [
+                        "https://images.unsplash.com/photo-1568051243858-533a607809a5",
+                        "https://images.unsplash.com/photo-1495364141860-b0d03eccd065",
+                        "https://images.unsplash.com/photo-1455390582262-044cdead277a",
+                    ],
                     "Set de bolígrafos punta fina rojo y verde",
                 ),
             },
@@ -128,7 +151,11 @@ PRODUCTS = [
                 "minimum_stock": 5,
                 "initial_stock": 20,
                 "images": _gallery(
-                    "https://images.unsplash.com/photo-1544947950-fa07a98d237f",
+                    [
+                        "https://images.unsplash.com/photo-1544947950-fa07a98d237f",
+                        "https://images.unsplash.com/photo-1481627834876-b7833e8f5570",
+                        "https://images.unsplash.com/photo-1512820790803-83ca734da794",
+                    ],
                     "Manual de laboratorio de anatomía",
                 ),
             }
@@ -152,7 +179,11 @@ PRODUCTS = [
                 "minimum_stock": 5,
                 "initial_stock": 25,
                 "images": _gallery(
-                    "https://images.unsplash.com/photo-1509228468518-180dd4864904",
+                    [
+                        "https://images.unsplash.com/photo-1509228468518-180dd4864904",
+                        "https://images.unsplash.com/photo-1509266272358-7701da638078",
+                        "https://images.unsplash.com/photo-1503676260728-1c00da094a0b",
+                    ],
                     "Guía de fórmulas de cálculo diferencial",
                 ),
             }
@@ -176,7 +207,11 @@ PRODUCTS = [
                 "minimum_stock": 3,
                 "initial_stock": 15,
                 "images": _gallery(
-                    "https://images.unsplash.com/photo-1584362917165-526a968579e8",
+                    [
+                        "https://images.unsplash.com/photo-1584362917165-526a968579e8",
+                        "https://images.unsplash.com/photo-1579154204601-01588f351e67",
+                        "https://images.unsplash.com/photo-1584515933487-779824d29309",
+                    ],
                     "Estetoscopio de doble campana negro",
                 ),
             }
@@ -200,7 +235,11 @@ PRODUCTS = [
                 "minimum_stock": 5,
                 "initial_stock": 30,
                 "images": _gallery(
-                    "https://images.unsplash.com/photo-1584982751601-97dcc096659c",
+                    [
+                        "https://images.unsplash.com/photo-1584982751601-97dcc096659c",
+                        "https://images.unsplash.com/photo-1576091160550-2173dba999ef",
+                        "https://images.unsplash.com/photo-1622253692010-333f2da6031d",
+                    ],
                     "Bata médica de laboratorio talla M",
                 ),
             },
@@ -216,7 +255,11 @@ PRODUCTS = [
                 "minimum_stock": 5,
                 "initial_stock": 25,
                 "images": _gallery(
-                    "https://images.unsplash.com/photo-1584982751601-97dcc096659c",
+                    [
+                        "https://images.unsplash.com/photo-1584982751601-97dcc096659c",
+                        "https://images.unsplash.com/photo-1576091160550-2173dba999ef",
+                        "https://images.unsplash.com/photo-1622253692010-333f2da6031d",
+                    ],
                     "Bata médica de laboratorio talla L",
                 ),
             },
@@ -240,7 +283,11 @@ PRODUCTS = [
                 "minimum_stock": 5,
                 "initial_stock": 20,
                 "images": _gallery(
-                    "https://images.unsplash.com/photo-1503387762-592deb58ef4e",
+                    [
+                        "https://images.unsplash.com/photo-1503387762-592deb58ef4e",
+                        "https://images.unsplash.com/photo-1513364776144-60967b0f800f",
+                        "https://images.unsplash.com/photo-1503387837-b154d5074bd2",
+                    ],
                     "Set de reglas T y escalímetro",
                 ),
             }
@@ -264,7 +311,11 @@ PRODUCTS = [
                 "minimum_stock": 8,
                 "initial_stock": 35,
                 "images": _gallery(
-                    "https://images.unsplash.com/photo-1587145820266-a5951ee6f620",
+                    [
+                        "https://images.unsplash.com/photo-1587145820266-a5951ee6f620",
+                        "https://images.unsplash.com/photo-1587614382346-4ec70e388b28",
+                        "https://images.unsplash.com/photo-1554224155-6726b3ff858f",
+                    ],
                     "Calculadora científica de 240 funciones",
                 ),
             }
@@ -288,7 +339,11 @@ PRODUCTS = [
                 "minimum_stock": 10,
                 "initial_stock": 40,
                 "images": _gallery(
-                    "https://images.unsplash.com/photo-1618410320928-25228d811631",
+                    [
+                        "https://images.unsplash.com/photo-1618410320928-25228d811631",
+                        "https://images.unsplash.com/photo-1573164713988-8665fc963095",
+                        "https://images.unsplash.com/photo-1541029071515-84cc54f84dc5",
+                    ],
                     "Memoria USB de 32GB metálica",
                 ),
             },
@@ -304,7 +359,11 @@ PRODUCTS = [
                 "minimum_stock": 10,
                 "initial_stock": 30,
                 "images": _gallery(
-                    "https://images.unsplash.com/photo-1618410320928-25228d811631",
+                    [
+                        "https://images.unsplash.com/photo-1618410320928-25228d811631",
+                        "https://images.unsplash.com/photo-1573164713988-8665fc963095",
+                        "https://images.unsplash.com/photo-1541029071515-84cc54f84dc5",
+                    ],
                     "Memoria USB de 64GB metálica",
                 ),
             },
@@ -328,7 +387,11 @@ PRODUCTS = [
                 "minimum_stock": 10,
                 "initial_stock": 30,
                 "images": _gallery(
-                    "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab",
+                    [
+                        "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab",
+                        "https://images.unsplash.com/photo-1503341504253-dff4815485f1",
+                        "https://images.unsplash.com/photo-1576566588028-4147f3842f27",
+                    ],
                     "T-Shirt institucional UASD talla M",
                 ),
             },
@@ -344,7 +407,11 @@ PRODUCTS = [
                 "minimum_stock": 10,
                 "initial_stock": 25,
                 "images": _gallery(
-                    "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab",
+                    [
+                        "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab",
+                        "https://images.unsplash.com/photo-1503341504253-dff4815485f1",
+                        "https://images.unsplash.com/photo-1576566588028-4147f3842f27",
+                    ],
                     "T-Shirt institucional UASD talla L",
                 ),
             },
