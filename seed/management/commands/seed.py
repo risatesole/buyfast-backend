@@ -12,6 +12,21 @@ ADMIN_PASSWORD = "blue"
 ADMIN_FIRST_NAME = "Admin"
 ADMIN_LAST_NAME = "Admin"
 
+
+def _gallery(base_url, alt_text):
+    """
+    Builds the standard 4-image set for a variant (HERO, GALLERY, DETAIL,
+    THUMBNAIL) by re-cropping the same source photo at different sizes —
+    same approach already used for the category banner/cart/default images.
+    """
+    return [
+        {"image": f"{base_url}?w=800&h=800&fit=crop", "image_type": "HERO", "alt_text": alt_text, "order": 0},
+        {"image": f"{base_url}?w=800&h=600&fit=crop", "image_type": "GALLERY", "alt_text": alt_text, "order": 1},
+        {"image": f"{base_url}?w=600&h=600&fit=crop", "image_type": "DETAIL", "alt_text": alt_text, "order": 2},
+        {"image": f"{base_url}?w=200&h=200&fit=crop", "image_type": "THUMBNAIL", "alt_text": alt_text, "order": 3},
+    ]
+
+
 # Each entry mirrors the Product -> ProductVariant -> ProductImage shape:
 # one product, its variant(s), and each variant's image(s), all in one JSON-like block.
 PRODUCTS = [
@@ -32,21 +47,27 @@ PRODUCTS = [
                 "tax_rate": "0.18",
                 "minimum_stock": 10,
                 "initial_stock": 50,
-                "images": [
-                    {
-                        "image": "https://images.unsplash.com/photo-1531346878377-a5be20888e57?w=800&h=800&fit=crop",
-                        "image_type": "HERO",
-                        "alt_text": "Cuaderno universitario de 100 hojas rayado",
-                        "order": 0,
-                    },
-                    {
-                        "image": "https://images.unsplash.com/photo-1531346878377-a5be20888e57?w=200&h=200&fit=crop",
-                        "image_type": "THUMBNAIL",
-                        "alt_text": "Cuaderno universitario de 100 hojas rayado",
-                        "order": 1,
-                    },
-                ],
-            }
+                "images": _gallery(
+                    "https://images.unsplash.com/photo-1531346878377-a5be20888e57",
+                    "Cuaderno universitario de 100 hojas rayado",
+                ),
+            },
+            {
+                "name": "Cuaderno Universitario 100 Hojas - Cuadriculado",
+                "description": "Cuaderno universitario de 100 hojas cuadriculadas, útil para materias de ciencias y matemáticas.",
+                "attribute": "Cuadriculado",
+                "variantnumber": 2,
+                "slug": "cuaderno-universitario-100-hojas-cuadriculado",
+                "sku": "PAP-CUAD-002",
+                "selling_price": "150.00",
+                "tax_rate": "0.18",
+                "minimum_stock": 10,
+                "initial_stock": 45,
+                "images": _gallery(
+                    "https://images.unsplash.com/photo-1531346878377-a5be20888e57",
+                    "Cuaderno universitario de 100 hojas cuadriculado",
+                ),
+            },
         ],
     },
     {
@@ -66,15 +87,27 @@ PRODUCTS = [
                 "tax_rate": "0.18",
                 "minimum_stock": 15,
                 "initial_stock": 60,
-                "images": [
-                    {
-                        "image": "https://images.unsplash.com/photo-1583485088034-697b5bc36b90?w=800&h=800&fit=crop",
-                        "image_type": "HERO",
-                        "alt_text": "Set de bolígrafos punta fina azul y negro",
-                        "order": 0,
-                    }
-                ],
-            }
+                "images": _gallery(
+                    "https://images.unsplash.com/photo-1583485088034-697b5bc36b90",
+                    "Set de bolígrafos punta fina azul y negro",
+                ),
+            },
+            {
+                "name": "Set de Bolígrafos Punta Fina - Rojo y Verde",
+                "description": "Set de bolígrafos de punta fina en tinta roja y verde, ideal para correcciones y anotaciones.",
+                "attribute": "Rojo y Verde",
+                "variantnumber": 2,
+                "slug": "set-boligrafos-punta-fina-rojo-verde",
+                "sku": "PAP-BOLI-002",
+                "selling_price": "95.00",
+                "tax_rate": "0.18",
+                "minimum_stock": 15,
+                "initial_stock": 55,
+                "images": _gallery(
+                    "https://images.unsplash.com/photo-1583485088034-697b5bc36b90",
+                    "Set de bolígrafos punta fina rojo y verde",
+                ),
+            },
         ],
     },
     {
@@ -94,14 +127,10 @@ PRODUCTS = [
                 "tax_rate": "0.00",
                 "minimum_stock": 5,
                 "initial_stock": 20,
-                "images": [
-                    {
-                        "image": "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=800&h=800&fit=crop",
-                        "image_type": "HERO",
-                        "alt_text": "Manual de laboratorio de anatomía",
-                        "order": 0,
-                    }
-                ],
+                "images": _gallery(
+                    "https://images.unsplash.com/photo-1544947950-fa07a98d237f",
+                    "Manual de laboratorio de anatomía",
+                ),
             }
         ],
     },
@@ -122,14 +151,10 @@ PRODUCTS = [
                 "tax_rate": "0.00",
                 "minimum_stock": 5,
                 "initial_stock": 25,
-                "images": [
-                    {
-                        "image": "https://images.unsplash.com/photo-1509228468518-180dd4864904?w=800&h=800&fit=crop",
-                        "image_type": "HERO",
-                        "alt_text": "Guía de fórmulas de cálculo diferencial",
-                        "order": 0,
-                    }
-                ],
+                "images": _gallery(
+                    "https://images.unsplash.com/photo-1509228468518-180dd4864904",
+                    "Guía de fórmulas de cálculo diferencial",
+                ),
             }
         ],
     },
@@ -150,14 +175,10 @@ PRODUCTS = [
                 "tax_rate": "0.18",
                 "minimum_stock": 3,
                 "initial_stock": 15,
-                "images": [
-                    {
-                        "image": "https://images.unsplash.com/photo-1584362917165-526a968579e8?w=800&h=800&fit=crop",
-                        "image_type": "HERO",
-                        "alt_text": "Estetoscopio de doble campana negro",
-                        "order": 0,
-                    }
-                ],
+                "images": _gallery(
+                    "https://images.unsplash.com/photo-1584362917165-526a968579e8",
+                    "Estetoscopio de doble campana negro",
+                ),
             }
         ],
     },
@@ -178,14 +199,10 @@ PRODUCTS = [
                 "tax_rate": "0.18",
                 "minimum_stock": 5,
                 "initial_stock": 30,
-                "images": [
-                    {
-                        "image": "https://images.unsplash.com/photo-1584982751601-97dcc096659c?w=800&h=800&fit=crop",
-                        "image_type": "HERO",
-                        "alt_text": "Bata médica de laboratorio talla M",
-                        "order": 0,
-                    }
-                ],
+                "images": _gallery(
+                    "https://images.unsplash.com/photo-1584982751601-97dcc096659c",
+                    "Bata médica de laboratorio talla M",
+                ),
             },
             {
                 "name": "Bata Médica de Laboratorio - Talla L",
@@ -198,14 +215,10 @@ PRODUCTS = [
                 "tax_rate": "0.18",
                 "minimum_stock": 5,
                 "initial_stock": 25,
-                "images": [
-                    {
-                        "image": "https://images.unsplash.com/photo-1584982751601-97dcc096659c?w=800&h=800&fit=crop",
-                        "image_type": "HERO",
-                        "alt_text": "Bata médica de laboratorio talla L",
-                        "order": 0,
-                    }
-                ],
+                "images": _gallery(
+                    "https://images.unsplash.com/photo-1584982751601-97dcc096659c",
+                    "Bata médica de laboratorio talla L",
+                ),
             },
         ],
     },
@@ -226,14 +239,10 @@ PRODUCTS = [
                 "tax_rate": "0.18",
                 "minimum_stock": 5,
                 "initial_stock": 20,
-                "images": [
-                    {
-                        "image": "https://images.unsplash.com/photo-1503387762-592deb58ef4e?w=800&h=800&fit=crop",
-                        "image_type": "HERO",
-                        "alt_text": "Set de reglas T y escalímetro",
-                        "order": 0,
-                    }
-                ],
+                "images": _gallery(
+                    "https://images.unsplash.com/photo-1503387762-592deb58ef4e",
+                    "Set de reglas T y escalímetro",
+                ),
             }
         ],
     },
@@ -254,27 +263,23 @@ PRODUCTS = [
                 "tax_rate": "0.18",
                 "minimum_stock": 8,
                 "initial_stock": 35,
-                "images": [
-                    {
-                        "image": "https://images.unsplash.com/photo-1587145820266-a5951ee6f620?w=800&h=800&fit=crop",
-                        "image_type": "HERO",
-                        "alt_text": "Calculadora científica de 240 funciones",
-                        "order": 0,
-                    }
-                ],
+                "images": _gallery(
+                    "https://images.unsplash.com/photo-1587145820266-a5951ee6f620",
+                    "Calculadora científica de 240 funciones",
+                ),
             }
         ],
     },
     {
-        "name": "Memoria USB 32GB",
-        "slug": "memoria-usb-32gb",
+        "name": "Memoria USB",
+        "slug": "memoria-usb",
         "category_slug": "electronicos",
         "thumbnail": "https://images.unsplash.com/photo-1618410320928-25228d811631?w=400&h=400&fit=crop",
         "variants": [
             {
-                "name": "Memoria USB 32GB - Metálica",
+                "name": "Memoria USB - 32GB Metálica",
                 "description": "Memoria USB de 32GB con carcasa metálica resistente, compatible con USB 3.0.",
-                "attribute": "Metálica",
+                "attribute": "32GB",
                 "variantnumber": 1,
                 "slug": "memoria-usb-32gb-metalica",
                 "sku": "ELE-USB-001-32",
@@ -282,15 +287,27 @@ PRODUCTS = [
                 "tax_rate": "0.18",
                 "minimum_stock": 10,
                 "initial_stock": 40,
-                "images": [
-                    {
-                        "image": "https://images.unsplash.com/photo-1618410320928-25228d811631?w=800&h=800&fit=crop",
-                        "image_type": "HERO",
-                        "alt_text": "Memoria USB de 32GB metálica",
-                        "order": 0,
-                    }
-                ],
-            }
+                "images": _gallery(
+                    "https://images.unsplash.com/photo-1618410320928-25228d811631",
+                    "Memoria USB de 32GB metálica",
+                ),
+            },
+            {
+                "name": "Memoria USB - 64GB Metálica",
+                "description": "Memoria USB de 64GB con carcasa metálica resistente, compatible con USB 3.0.",
+                "attribute": "64GB",
+                "variantnumber": 2,
+                "slug": "memoria-usb-64gb-metalica",
+                "sku": "ELE-USB-001-64",
+                "selling_price": "650.00",
+                "tax_rate": "0.18",
+                "minimum_stock": 10,
+                "initial_stock": 30,
+                "images": _gallery(
+                    "https://images.unsplash.com/photo-1618410320928-25228d811631",
+                    "Memoria USB de 64GB metálica",
+                ),
+            },
         ],
     },
     {
@@ -310,15 +327,27 @@ PRODUCTS = [
                 "tax_rate": "0.18",
                 "minimum_stock": 10,
                 "initial_stock": 30,
-                "images": [
-                    {
-                        "image": "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=800&h=800&fit=crop",
-                        "image_type": "HERO",
-                        "alt_text": "T-Shirt institucional UASD talla M",
-                        "order": 0,
-                    }
-                ],
-            }
+                "images": _gallery(
+                    "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab",
+                    "T-Shirt institucional UASD talla M",
+                ),
+            },
+            {
+                "name": "T-Shirt Institucional UASD - Talla L",
+                "description": "T-Shirt institucional UASD talla L, algodón suave con el logo bordado del Económato.",
+                "attribute": "Talla L",
+                "variantnumber": 2,
+                "slug": "tshirt-institucional-uasd-l",
+                "sku": "UNI-TSHIRT-001-L",
+                "selling_price": "550.00",
+                "tax_rate": "0.18",
+                "minimum_stock": 10,
+                "initial_stock": 25,
+                "images": _gallery(
+                    "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab",
+                    "T-Shirt institucional UASD talla L",
+                ),
+            },
         ],
     },
 ]
