@@ -1,7 +1,10 @@
+import random
+from datetime import timedelta
 from decimal import Decimal
 
 from django.core.management.base import BaseCommand
 from django.db import transaction
+from django.utils import timezone
 
 from accounts.models import PERMISSION_CODES, EmployeePosition, Profile, User, employee_model
 from inventory.inventory import create_initial_inventory
@@ -11,6 +14,12 @@ ADMIN_EMAIL = "admin@example.com"
 ADMIN_PASSWORD = "blue"
 ADMIN_FIRST_NAME = "Admin"
 ADMIN_LAST_NAME = "Admin"
+
+# Seeded products should read as having been added ~2 weeks ago rather than
+# at the exact moment the command runs, so demo data (dashboards, "recently
+# added" sorts, etc.) doesn't all cluster at "today". Jittered by a few
+# hours per product/variant so they don't all share one identical timestamp.
+PRODUCT_SEEDED_DAYS_AGO = 14
 
 
 def _gallery(image_urls, alt_text):
@@ -850,6 +859,13 @@ class Command(BaseCommand):
         status = "created" if employee_created else "already exists"
         self.stdout.write(f"  Employee record ({employee.position}, profile={profile.name}) — {status}")
 
+    def _seeded_timestamp(self):
+        return timezone.now() - timedelta(
+            days=PRODUCT_SEEDED_DAYS_AGO,
+            hours=random.randint(0, 23),
+            minutes=random.randint(0, 59),
+        )
+
     def _seed_products(self):
         for product_data in PRODUCTS:
             try:
@@ -871,6 +887,9 @@ class Command(BaseCommand):
                     "thumbnail": product_data.get("thumbnail", ""),
                 },
             )
+            if created:
+                seeded_at = self._seeded_timestamp()
+                Product.objects.filter(pk=product.pk).update(created_at=seeded_at, updated_at=seeded_at)
             status = "created" if created else "already exists"
             self.stdout.write(f"  {product.name} — {status}")
 
@@ -894,7 +913,14 @@ class Command(BaseCommand):
                 # already existed may have had its stock adjusted by an admin
                 # since, and re-running the seed shouldn't overwrite that.
                 if variant_created:
-                    create_initial_inventory(variant.id, variant_data.get("initial_stock", 0))
+                    seeded_at = self._seeded_timestamp()
+                    ProductVariant.objects.filter(pk=variant.pk).update(created_at=seeded_at, updated_at=seeded_at)
+                    # Backdate the initial stock movement to match — otherwise
+                    # it keeps today's real timestamp and, since it's the
+                    # newest movement by date_time, permanently shadows every
+                    # later (correctly backdated) sale when "current stock"
+                    # is computed from the most recent movement's balance.
+                    create_initial_inventory(variant.id, variant_data.get("initial_stock", 0), date_time=seeded_at)
                     self.stdout.write(
                         f"    stocked {variant.name} with {variant_data.get('initial_stock', 0)} units"
                     )

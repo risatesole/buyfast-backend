@@ -3,9 +3,12 @@ from datetime import timedelta
 
 from django.core.management.base import BaseCommand
 from django.db import transaction
+from django.db.models import Max
 from django.utils import timezone
 
 from accounts.models import User
+from inventory.inventory import ProductUnavailableException, sell_products
+from inventory.models import StockMovement_model
 from orders.models import Order, OrderItem, OrderPayment
 from payment.models import PaymentProvider, PaymentProviderTransaction
 from products.default.models import ProductVariant
@@ -43,6 +46,16 @@ LAST_NAMES = [
     "Reyes", "Morales", "Cruz", "Ortiz", "Gutierrez", "Chavez", "Ramos",
     "Vargas", "Castillo", "Jimenez", "Mendoza", "Rojas", "Herrera", "Medina",
 ]
+
+
+def _available_stock(variant_id):
+    latest_movement = (
+        StockMovement_model.objects
+        .filter(product_variant_id=variant_id)
+        .order_by("-date_time", "-id")
+        .first()
+    )
+    return latest_movement.balance if latest_movement else 0
 
 
 class Command(BaseCommand):
@@ -102,10 +115,28 @@ class Command(BaseCommand):
         self.stdout.write(f"  PaymentProvider — {'created' if provider_created else 'already exists'}: {payment_provider.name}")
 
         now = timezone.now()
-        users_created = 0
-        orders_created = 0
-        items_created = 0
 
+        # "Current stock" everywhere in this app (see inventory/queries.py)
+        # is read off the *most recent movement by date_time* for a variant.
+        # That means every seeded order's date_time must land strictly after
+        # the variant's initial stocking, or the backdated initial_inventory
+        # row would keep outranking it and permanently hide the sale. This is
+        # the floor every order date gets clamped to below.
+        stocking_floor = StockMovement_model.objects.filter(
+            movement_type="initial_inventory"
+        ).aggregate(latest=Max("date_time"))["latest"]
+        if stocking_floor is None:
+            stocking_floor = now - timedelta(days=days_back + 1)
+        stocking_floor = stocking_floor + timedelta(minutes=1)
+
+        users_created = 0
+
+        # Phase 1: create/reuse the customers and decide *when* each of their
+        # orders happened, but not yet *what* they bought — that depends on
+        # stock levels, which only make sense to evaluate once we know the
+        # true chronological order these orders are being placed in (see
+        # phase 2 below).
+        planned_orders = []
         for i in range(user_count):
             first_name = random.choice(FIRST_NAMES)
             last_name = random.choice(LAST_NAMES)
@@ -135,49 +166,94 @@ class Command(BaseCommand):
                     hours=random.randint(0, 23),
                     minutes=random.randint(0, 59),
                 )
-                order_created_at = now - created_at_offset
+                order_created_at = max(now - created_at_offset, stocking_floor)
                 status = random.choice(STATUS_CHOICES)
-                has_pickup = random.random() > 0.25
-                pickup_time = (order_created_at + timedelta(days=random.randint(1, 7))) if has_pickup else None
+                planned_orders.append({"user": user, "created_at": order_created_at, "status": status})
 
-                order = Order.objects.create(customer=user, status=status, pickup_time=pickup_time)
-                Order.objects.filter(pk=order.pk).update(created_at=order_created_at)
-                orders_created += 1
+            self.stdout.write(f"  {user.email} — {order_count} orders planned ({'new user' if user_created else 'existing user'})")
 
-                item_count = random.randint(MIN_ITEMS_PER_ORDER, MAX_ITEMS_PER_ORDER)
-                chosen_variants = random.sample(variants, k=min(item_count, len(variants)))
-                order_subtotal = 0.0
-                for variant in chosen_variants:
-                    quantity = random.randint(1, 5)
-                    price_per_item = float(variant.selling_price)
-                    tax_amount = round(price_per_item * float(variant.tax_rate), 2)
-                    OrderItem.objects.create(
-                        order=order,
-                        product=variant,
-                        quantity=quantity,
-                        price_per_item=price_per_item,
-                        tax_amount=tax_amount,
-                    )
-                    order_subtotal += (price_per_item + tax_amount) * quantity
-                    items_created += 1
+        # Phase 2: process strictly oldest-first. Stock deductions are
+        # sequential by nature (each sale's balance is computed from
+        # whatever the previous movement's balance was) — processing in
+        # real chronological order keeps that chain consistent instead of
+        # having an order dated 2 days ago get processed before, and thus
+        # compute its balance from, an order dated 10 days ago.
+        planned_orders.sort(key=lambda plan: plan["created_at"])
 
-                payment_transaction = PaymentProviderTransaction.objects.create(
-                    payment_provider=payment_provider,
-                    reference_document=f"SEED-TXN-{order.id}-{random.randint(1000, 9999)}",
-                    amount=round(order_subtotal, 2),
-                    tax=0,
-                )
-                OrderPayment.objects.create(
+        orders_created = 0
+        items_created = 0
+        orders_skipped = 0
+
+        for plan in planned_orders:
+            item_count = random.randint(MIN_ITEMS_PER_ORDER, MAX_ITEMS_PER_ORDER)
+            candidate_variants = random.sample(variants, k=min(item_count, len(variants)))
+            order_items_data = []
+            sell_items = []
+            order_subtotal = 0.0
+            for variant in candidate_variants:
+                available = _available_stock(variant.id)
+                if available <= 0:
+                    continue
+                quantity = min(random.randint(1, 5), available)
+                price_per_item = float(variant.selling_price)
+                tax_amount = round(price_per_item * float(variant.tax_rate), 2)
+                order_items_data.append((variant, quantity, price_per_item, tax_amount))
+                sell_items.append({"productvariantid": variant.id, "quantity": quantity})
+                order_subtotal += (price_per_item + tax_amount) * quantity
+
+            if not order_items_data:
+                orders_skipped += 1
+                continue
+
+            order_created_at = plan["created_at"]
+            has_pickup = random.random() > 0.25
+            pickup_time = (order_created_at + timedelta(days=random.randint(1, 7))) if has_pickup else None
+
+            order = Order.objects.create(customer=plan["user"], status=plan["status"], pickup_time=pickup_time)
+            Order.objects.filter(pk=order.pk).update(created_at=order_created_at)
+
+            for variant, quantity, price_per_item, tax_amount in order_items_data:
+                OrderItem.objects.create(
                     order=order,
-                    payment_provider=payment_provider,
-                    payment_provider_transaction=payment_transaction,
-                    amount=round(order_subtotal, 2),
-                    tax_amount=0,
+                    product=variant,
+                    quantity=quantity,
+                    price_per_item=price_per_item,
+                    tax_amount=tax_amount,
+                )
+                items_created += 1
+
+            # Reuse the same use case the real checkout flow uses to
+            # decrease stock, so seeded orders actually move inventory
+            # instead of just existing as detached order rows.
+            reference = f"Seed order #{order.id}"
+            try:
+                sell_products(sell_items, reference)
+                StockMovement_model.objects.filter(
+                    document_reference=reference, movement_type="customer_sell"
+                ).update(date_time=order_created_at)
+            except ProductUnavailableException:
+                self.stdout.write(
+                    self.style.WARNING(f"    order #{order.id} — could not reserve stock, left as-is")
                 )
 
-            self.stdout.write(f"  {user.email} — {order_count} orders ({'new user' if user_created else 'existing user'})")
+            orders_created += 1
+
+            payment_transaction = PaymentProviderTransaction.objects.create(
+                payment_provider=payment_provider,
+                reference_document=f"SEED-TXN-{order.id}-{random.randint(1000, 9999)}",
+                amount=round(order_subtotal, 2),
+                tax=0,
+            )
+            OrderPayment.objects.create(
+                order=order,
+                payment_provider=payment_provider,
+                payment_provider_transaction=payment_transaction,
+                amount=round(order_subtotal, 2),
+                tax_amount=0,
+            )
 
         self.stdout.write(self.style.SUCCESS(
-            f"\n✓ Done. {users_created} customers created, {orders_created} orders created, {items_created} order items created.\n"
+            f"\n✓ Done. {users_created} customers created, {orders_created} orders created, "
+            f"{items_created} order items created ({orders_skipped} orders skipped — no stock left).\n"
         ))
         self.stdout.write(f"  Login password for all seeded customers: {CUSTOMER_PASSWORD}\n")
