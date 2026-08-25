@@ -13,10 +13,10 @@ from orders.models import Order, OrderItem, OrderPayment
 from payment.models import PaymentProvider, PaymentProviderTransaction
 from products.default.models import ProductVariant
 
-DEFAULT_USER_COUNT = 50
+DEFAULT_USER_COUNT = 20
 DEFAULT_MIN_ORDERS = 5
-DEFAULT_MAX_ORDERS = 10
-DEFAULT_DAYS_BACK = 14
+DEFAULT_MAX_ORDERS = 6
+DEFAULT_DAYS_BACK = 9
 
 CUSTOMER_PASSWORD = "Customer@12345"
 EMAIL_DOMAIN = "buyfast-demo.com"
