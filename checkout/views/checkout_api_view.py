@@ -1,4 +1,7 @@
+from datetime import timedelta
+
 from django.db import ProgrammingError
+from django.utils import timezone
 from rest_framework.decorators import api_view, authentication_classes
 from rest_framework.response import Response
 
@@ -8,6 +11,24 @@ from ..handlers.checkout_handler_post import checkout_handler_post
 from ..handlers.checkout_handler_get import checkout_handler_get
 from ..handlers.checkout_handler_delete import checkout_handler_delete
 from data_transfer_objects.ErrorResponse import ErrorResponse, ErrorCode
+
+PICKUP_WORK_DAYS = 7
+PICKUP_START_HOUR = 8
+PICKUP_END_HOUR = 17
+
+
+def _upcoming_pickup_dates(count):
+    dates = []
+    current = timezone.localdate() + timedelta(days=1)
+    while len(dates) < count:
+        if current.weekday() < 5:  # Monday=0 ... Friday=4
+            dates.append(current)
+        current += timedelta(days=1)
+    return dates
+
+
+def _pickup_slots():
+    return [f"{hour:02d}:00" for hour in range(PICKUP_START_HOUR, PICKUP_END_HOUR + 1)]
 
 
 @api_view(["GET", "POST", "DELETE"])
@@ -89,20 +110,11 @@ def checkout_timeslots_api_view(request):
             )
             return error.http_response()
 
+        slots = _pickup_slots()
         return Response({
             "availableDates": [
-                {
-                    "date": "2026-06-20",
-                    "slots": ["09:00", "10:00", "14:00", "17:25"]
-                },
-                {
-                    "date": "2026-06-21",
-                    "slots": ["11:00", "15:00"]
-                },
-                {
-                    "date": "2026-06-22",
-                    "slots": ["11:00", "15:00"]
-                }
+                {"date": date.isoformat(), "slots": slots}
+                for date in _upcoming_pickup_dates(PICKUP_WORK_DAYS)
             ]
         })
 

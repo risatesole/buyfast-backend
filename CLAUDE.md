@@ -1,7 +1,8 @@
 # Project: UASD Económato Online Store — Backend
 
-Django/DRF backend for **UASD's Económato** (a Dominican Republic university
-co-op store): students browse products, pay online, and pick the order up in
+Django/DRF backend for **UASD's Económato** — a supply store at the
+Universidad Autónoma de Santo Domingo, a public university in the Dominican
+Republic: students browse products, pay online, and pick the order up in
 person. The frontend is a separate Next.js app (see the `frontend` project's
 own `CLAUDE.md`) that talks to this API exclusively under `/api/v1/`.
 
