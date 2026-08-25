@@ -20,18 +20,6 @@ exclusivamente bajo `/api/v1/` (ver el `CLAUDE.md` del proyecto `frontend`).
   (`packages/mediaupload`) que envuelve el SDK de Supabase Storage.
 - Sin Celery, sin Channels — nada asíncrono pese a que existe `asgi.py`.
 
-## Instalación y ejecución local
-
-```bash
-uv sync
-cp .env.example .env   # completar credenciales de DB, email, PayPal, etc.
-uv run python manage.py migrate
-uv run python manage.py runserver
-```
-
-El esquema/documentación interactiva de la API queda disponible en
-`/api/schema/` una vez el servidor está corriendo.
-
 ## Arquitectura del proyecto
 
 El sistema está dividido en apps de Django por dominio, todas enrutadas desde
@@ -114,7 +102,7 @@ un único punto de entrada:
 
 ## Despliegue
 
-- **Docker**: `Dockerfile` instala dependencias desde `requirements.txt` y
-  levanta `gunicorn` sobre `config.wsgi`.
+- **Docker**: `Dockerfile` instala dependencias con `uv sync` (a partir de
+  `pyproject.toml`/`uv.lock`) y levanta `gunicorn` sobre `config.wsgi`.
 - **Vercel**: `vercel.json` corre `uv sync` + migraciones en el build y sirve
   `config/wsgi.py` como función Python.
