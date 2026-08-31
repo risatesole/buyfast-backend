@@ -12,7 +12,7 @@ from ..handlers.checkout_handler_get import checkout_handler_get
 from ..handlers.checkout_handler_delete import checkout_handler_delete
 from data_transfer_objects.ErrorResponse import ErrorResponse, ErrorCode
 
-PICKUP_WORK_DAYS = 7
+PICKUP_WORK_DAYS = 4
 PICKUP_START_HOUR = 8
 PICKUP_END_HOUR = 17
 
