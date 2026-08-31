@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
 
@@ -154,4 +155,37 @@ class employee_model(models.Model):
 
     def __str__(self):
         return f"Employee: {self.user.email} ({self.position})"
+
+
+class AdminActionLog(models.Model):
+    """
+    Audit trail of admin edits to a user's core identity (email, password,
+    name, matricula). Deliberately does not cover status/access-profile
+    changes (is_active, institution_member, profile reassignment) — those
+    are a separate concern. See ReportLog (reports/models.py) for the
+    sibling audit-log pattern this mirrors.
+    """
+
+    performed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="admin_action_logs",
+    )
+    target_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="target_of_admin_actions",
+    )
+    action = models.CharField(max_length=50, default="user_update")
+    changes = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "core_admin_action_log"
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self):
+        return f"{self.action} on {self.target_user} by {self.performed_by}"
 

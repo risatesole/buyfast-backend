@@ -23,6 +23,7 @@ from accounts.accounts import (
     verify_email_api_view,
 )
 from accounts.views.admin.users_api_view import users, user_details_api_view
+from accounts.views.admin.admin_action_logs_api_view import admin_action_logs_view
 from accounts.views.admin.profiles_api_view import profiles_list_view, profile_detail_view
 from accounts.views.employee_api_view import create_employee
 
@@ -102,6 +103,7 @@ urlpatterns = [
 
     path("users/<int:id>/", user_details_api_view, name="admin-user-detail"),
     path("users/", users, name="admin-users"),
+    path("admin/users/logs/", admin_action_logs_view, name="admin-user-action-logs"),
 
     path("employee/", create_employee, name="admin-create-employee"),
 

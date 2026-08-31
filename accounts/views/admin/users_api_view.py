@@ -1,12 +1,15 @@
 from rest_framework.decorators import api_view, authentication_classes
 from rest_framework.response import Response
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.validators import validate_email
+from django.contrib.auth.password_validation import validate_password
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.http import Http404
 
 from api.utils import CsrfExemptSessionAuthentication
 from api.permissions import require_permission, has_permission
-from accounts.models import User, Profile
+from accounts.models import User, Profile, AdminActionLog
 from .users_api_serializer import UserSerializer
 
 
@@ -77,11 +80,43 @@ def user_details_api_view(request, id):
 
             matricula:
                 - Type: string
-                - Description: User's registration number.
+                - Description: User's registration number. Superuser only.
                 - Example:
                     {
                         "matricula": "B67890"
                     }
+
+            email:
+                - Type: string
+                - Description: User's login email. Superuser only.
+                - Example:
+                    {
+                        "email": "new.email@example.com"
+                    }
+
+            first_name / last_name:
+                - Type: string
+                - Description: User's given/family name. Superuser only.
+                - Example:
+                    {
+                        "first_name": "John",
+                        "last_name": "Doe"
+                    }
+
+            password:
+                - Type: string
+                - Description: Sets a new password for the user (properly
+                  hashed via set_password). Superuser only. Write-only —
+                  never returned in a response.
+                - Example:
+                    {
+                        "password": "NewStrongPassword123"
+                    }
+
+            Edits to email, password, first_name, last_name, and matricula
+            are recorded in AdminActionLog (audit trail of who changed what
+            on a user's core identity). is_active/institution_member/profile
+            changes are not part of this audit trail.
 
             Multiple fields can be updated together:
 
@@ -153,6 +188,10 @@ def user_details_api_view(request, id):
         )
 
     updated = False
+    # Tracks only edits to the user's core identity (email/password/name/
+    # matricula) for AdminActionLog — is_active/institution_member/profile
+    # changes below are intentionally not added to this dict.
+    changes = {}
 
     institution_member = request.data.get("institution_member")
     if institution_member is not None:
@@ -224,8 +263,112 @@ def user_details_api_view(request, id):
                 },
                 status=400,
             )
-        
-        user.matricula = new_matricula
+
+        if new_matricula != user.matricula:
+            changes["matricula"] = {"old": user.matricula, "new": new_matricula}
+            user.matricula = new_matricula
+            updated = True
+
+    new_email = request.data.get("email")
+    if new_email is not None:
+        # Email is the login identifier — same superuser-only precedent as
+        # matricula above.
+        if not request.user.is_superuser:
+            return Response(
+                {"success": False, "message": "Only a superuser can change the email."},
+                status=403,
+            )
+
+        if not isinstance(new_email, str):
+            return Response(
+                {"success": False, "message": "email must be a string."},
+                status=400,
+            )
+
+        new_email = new_email.strip()
+        try:
+            validate_email(new_email)
+        except DjangoValidationError:
+            return Response(
+                {"success": False, "message": "Invalid email address."},
+                status=400,
+            )
+
+        if User.objects.filter(email__iexact=new_email).exclude(pk=user.pk).exists():
+            return Response(
+                {"success": False, "message": "This email is already in use."},
+                status=400,
+            )
+
+        if new_email != user.email:
+            changes["email"] = {"old": user.email, "new": new_email}
+            user.email = new_email
+            updated = True
+
+    new_first_name = request.data.get("first_name")
+    if new_first_name is not None:
+        if not request.user.is_superuser:
+            return Response(
+                {"success": False, "message": "Only a superuser can change the first name."},
+                status=403,
+            )
+
+        if not isinstance(new_first_name, str) or not new_first_name.strip():
+            return Response(
+                {"success": False, "message": "first_name must be a non-empty string."},
+                status=400,
+            )
+
+        new_first_name = new_first_name.strip()
+        if new_first_name != user.first_name:
+            changes["first_name"] = {"old": user.first_name, "new": new_first_name}
+            user.first_name = new_first_name
+            updated = True
+
+    new_last_name = request.data.get("last_name")
+    if new_last_name is not None:
+        if not request.user.is_superuser:
+            return Response(
+                {"success": False, "message": "Only a superuser can change the last name."},
+                status=403,
+            )
+
+        if not isinstance(new_last_name, str) or not new_last_name.strip():
+            return Response(
+                {"success": False, "message": "last_name must be a non-empty string."},
+                status=400,
+            )
+
+        new_last_name = new_last_name.strip()
+        if new_last_name != user.last_name:
+            changes["last_name"] = {"old": user.last_name, "new": new_last_name}
+            user.last_name = new_last_name
+            updated = True
+
+    new_password = request.data.get("password")
+    if new_password is not None:
+        if not request.user.is_superuser:
+            return Response(
+                {"success": False, "message": "Only a superuser can change the password."},
+                status=403,
+            )
+
+        if not isinstance(new_password, str):
+            return Response(
+                {"success": False, "message": "password must be a string."},
+                status=400,
+            )
+
+        try:
+            validate_password(new_password, user=user)
+        except DjangoValidationError as e:
+            return Response(
+                {"success": False, "message": " ".join(e.messages)},
+                status=400,
+            )
+
+        user.set_password(new_password)
+        changes["password"] = {"changed": True}
         updated = True
 
     # Reassign an employee's access profile (e.g. moving someone from Human
@@ -266,6 +409,13 @@ def user_details_api_view(request, id):
 
     if updated:
         user.save()
+
+    if changes:
+        AdminActionLog.objects.create(
+            performed_by=request.user,
+            target_user=user,
+            changes=changes,
+        )
 
     serializer = UserSerializer(user)
 
