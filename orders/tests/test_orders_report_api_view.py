@@ -24,7 +24,11 @@ class AdminOrdersReportAPITests(APITestCase):
             role="customer",
         )
 
-        category = Category.objects.create(name="Papelería", slug="papeleria")
+        # "papeleria" is already seeded by seed/migrations/0001_seed_initial_data.py,
+        # so get_or_create (not create) to avoid colliding with that row.
+        category, _ = Category.objects.get_or_create(
+            slug="papeleria", defaults={"name": "Papelería"}
+        )
         product = Product.objects.create(
             name="Cuaderno",
             slug="cuaderno",
